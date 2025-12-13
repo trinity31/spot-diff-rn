@@ -1,20 +1,44 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ImageBackground, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRoute, useFocusEffect } from '@react-navigation/native';
+import { useRoute, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { GameDataService } from '../services/GameDataService';
+import { Feather } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - SIZES.padding * 3) / 2;
 
+const STAGE_TITLES = {
+  1: "아늑한 거실",
+  2: "눈 내리는 거리",
+  3: "산타의 선물",
+  4: "루돌프와 썰매",
+  5: "장작불 앞",
+};
+
+// Local Assets (Mocking multiple stages with the same asset for now)
+const STAGE_IMAGES = {
+  1: require('../../assets/images/season1_stage1_orig.png'),
+  // Add more placeholders if available, otherwise fallback
+};
+
 const StageScreen = () => {
+  const navigation = useNavigation();
   const route = useRoute();
-  const { seasonId } = route.params; // Get passed season ID
+  const { seasonId, seasonTitle } = route.params;
   const [stages, setStages] = useState([]);
 
-  // Mock total stages for now - in real app, might come from config or backend
   const TOTAL_STAGES = seasonId == 1 ? 30 : seasonId == 2 ? 35 : 40;
+
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      title: seasonTitle || '스테이지 선택',
+      headerTintColor: '#333',
+      headerStyle: { backgroundColor: '#F5F7FA' },
+      headerShadowVisible: false,
+    });
+  }, [navigation, seasonTitle]);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,25 +47,21 @@ const StageScreen = () => {
   );
 
   const loadStages = async () => {
-    // 1. Get user progress for this season
     const seasonProgress = await GameDataService.getSeasonProgress(seasonId);
 
-    // 2. Build stage list combining config (1..N) and progress (unlocked/stars)
     const stageList = Array.from({ length: TOTAL_STAGES }, (_, i) => {
       const stageId = i + 1;
       const progress = seasonProgress[stageId];
-
-      // Default: Locked unless found in progress and marked unlocked
-      // Exception: Stage 1 of Season 1 is always unlocked (handled by GameDataService init, but safe fallback here)
       let unlocked = progress?.unlocked || false;
       if (seasonId == 1 && stageId == 1) unlocked = true;
 
       return {
         id: stageId,
-        title: `Stage ${stageId}`,
+        title: STAGE_TITLES[stageId] || `여행지 ${stageId}`,
         locked: !unlocked,
-        stars: progress ? progress.stars : 0,
-        cleared: progress ? progress.cleared : false
+        cleared: progress ? progress.cleared : false,
+        // Fallback to stage 1 image for demo
+        image: STAGE_IMAGES[stageId] || STAGE_IMAGES[1]
       };
     });
 
@@ -49,68 +69,70 @@ const StageScreen = () => {
   };
 
   const handleStagePress = (stage) => {
-    // TODO: Navigate to actual Game Screen
-    // For now, let's simulate clearing it to test persistence
-    simulateClearStage(stage.id);
-  };
-
-  const simulateClearStage = async (stageId) => {
-    // Mock clearing with random stars (2 or 3)
-    const stars = Math.floor(Math.random() * 2) + 2;
-    const score = stars * 100;
-
-    console.log(`Clearing Season ${seasonId} Stage ${stageId} with ${stars} stars`);
-    await GameDataService.saveStageClear(seasonId, stageId, stars, score);
-
-    // Refresh
-    loadStages();
+    navigation.navigate('Game', {
+      seasonId: seasonId,
+      stageId: stage.id
+    });
   };
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.9}
       disabled={item.locked}
       onPress={() => handleStagePress(item)}
       style={styles.cardContainer}
     >
-      <LinearGradient
-        colors={item.locked ? ['#A0aec0', '#718096'] : COLORS.gradients.primaryButton}
-        style={styles.card}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{item.id}</Text>
-          {item.locked && <Text style={styles.icon}>🔒</Text>}
-          {!item.locked && <Text style={styles.icon}>{item.cleared ? '✓' : '▶️'}</Text>}
-        </View>
-        <Text style={styles.stageLabel}>Stage</Text>
-
-        {!item.locked && (
-          <View style={styles.starsContainer}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Text key={i} style={styles.star}>
-                {i < item.stars ? '⭐' : '☆'}
+      <View style={styles.cardShadow}>
+        <ImageBackground
+          source={item.image}
+          style={[styles.cardImage, item.locked && styles.imageLocked]}
+          imageStyle={{ borderRadius: 15 }}
+          resizeMode="cover"
+        >
+          {/* Overlay Gradient/Darkness */}
+          <View style={[
+            styles.cardOverlay,
+            item.locked ? styles.overlayLocked : styles.overlayUnlocked
+          ]}>
+            {/* Content */}
+            <View style={styles.textContainer}>
+              <Text style={styles.stageNumber}>
+                {item.id.toString().padStart(2, '0')}
               </Text>
-            ))}
+
+              <View style={styles.divider} />
+
+              <Text style={styles.stageTitle} numberOfLines={1}>
+                {item.locked ? '잠긴 여행지' : item.title}
+              </Text>
+
+              {/* Status Icons */}
+              <View style={styles.statusIcons}>
+                {item.locked && <Text style={styles.lockIcon}>🔒</Text>}
+                {item.cleared && <Text style={styles.checkIcon}>✓</Text>}
+              </View>
+            </View>
           </View>
-        )}
-      </LinearGradient>
+        </ImageBackground>
+      </View>
     </TouchableOpacity>
   );
 
   return (
-    <LinearGradient
-      colors={COLORS.gradients.background}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      {/* Background updated to match app theme (SeasonScreen uses ['#667eea', '#764ba2']) */}
+      {/* Using a lighter version or complementary gradient for Stage Selection */}
+      <LinearGradient colors={['#f3e7e9', '#e3eeff']} style={StyleSheet.absoluteFill} />
+
       <FlatList
         data={stages}
         renderItem={renderItem}
         keyExtractor={item => item.id.toString()}
-        numColumns={2}
+        numColumns={1} // Single column for "Scenery" look
         contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
+        showsVerticalScrollIndicator={false}
       />
-    </LinearGradient>
+    </View>
   );
 };
 
@@ -119,65 +141,82 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: SIZES.padding,
-    paddingTop: SIZES.padding + 10,
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
-    marginBottom: SIZES.padding,
+    padding: 20,
+    paddingTop: 10,
   },
   cardContainer: {
-    width: ITEM_WIDTH,
-    height: ITEM_WIDTH * 1.2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    marginBottom: 20,
+    height: 180, // Large scenery card
   },
-  card: {
+  cardShadow: {
     flex: 1,
-    borderRadius: SIZES.radius,
-    padding: SIZES.padding,
-    alignItems: 'center',
+    borderRadius: 15,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  cardImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end', // Text at bottom
+  },
+  imageLocked: {
+    opacity: 0.5, // Dim the image itself
+  },
+  cardOverlay: {
+    flex: 1,
+    borderRadius: 15,
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  cardHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
   },
-  cardTitle: {
+  overlayUnlocked: {
+    backgroundColor: 'rgba(0,0,0,0.1)', // Slight dark tint for text readability
+  },
+  overlayLocked: {
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker overlay for locked
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textContainer: {
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)', // Backdrop for text
+    borderRadius: 10,
+    minWidth: 120,
+  },
+  stageNumber: {
     fontSize: 32,
-    fontWeight: '900',
-    color: COLORS.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  stageLabel: {
-    fontSize: SIZES.body,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 12,
-  },
-  icon: {
-    fontSize: 20,
-    color: 'white',
     fontWeight: 'bold',
+    color: 'white',
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'Roboto',
   },
-  starsContainer: {
+  divider: {
+    width: 20,
+    height: 2,
+    backgroundColor: 'white',
+    marginVertical: 5,
+  },
+  stageTitle: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  statusIcons: {
     flexDirection: 'row',
-    gap: 2,
+    marginTop: 5,
   },
-  star: {
-    fontSize: 14,
-    color: '#FFD700',
+  lockIcon: {
+    fontSize: 24,
+  },
+  checkIcon: {
+    fontSize: 20,
+    color: '#4ADE80',
+    fontWeight: 'bold',
   },
 });
 

@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { GameDataService } from '../services/GameDataService';
 
@@ -77,6 +78,7 @@ const { width } = Dimensions.get('window');
 
 const SeasonScreen = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [seasons, setSeasons] = useState([
     {
       id: 1,
@@ -215,7 +217,10 @@ const SeasonScreen = () => {
 
   const handleSeasonPress = (season) => {
     if (season.status !== 'locked') {
-      navigation.navigate('Stage', { seasonId: season.id });
+      navigation.navigate('Stage', {
+        seasonId: season.id,
+        seasonTitle: season.title // Just the title, e.g. "발견의 시작"
+      });
     }
   };
 
@@ -339,7 +344,7 @@ const SeasonScreen = () => {
     >
       <FlatList
         ListHeaderComponent={
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 20, paddingBottom: 40 }]}>
             <Text style={styles.screenTitle}>🔍 틀린그림찾기</Text>
             <Text style={styles.screenSubtitle}>숨겨진 차이를 찾아 모험을 떠나보세요!</Text>
           </View>

@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/SplashScreen';
 import LandingScreen from '../screens/LandingScreen';
 import StageScreen from '../screens/StageScreen';
+import GameScreen from '../screens/GameScreen';
 
 import { COLORS } from '../constants/theme';
 
@@ -28,8 +29,10 @@ const AppNavigator = () => {
           name="Season"
           component={SeasonScreen}
           options={{
-            headerShown: true,
+            headerShown: false, // User requested to hide header
             title: '시즌 선택',
+            headerBackTitle: '',
+            headerBackTitleVisible: false,
             headerStyle: { backgroundColor: COLORS.primary.purple },
             headerTintColor: COLORS.white,
             headerTitleStyle: { fontWeight: 'bold' },
@@ -41,11 +44,14 @@ const AppNavigator = () => {
           options={{
             headerShown: true,
             title: '스테이지 선택',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
             headerStyle: { backgroundColor: COLORS.primary.purple },
             headerTintColor: COLORS.white,
             headerTitleStyle: { fontWeight: 'bold' },
           }}
         />
+        <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
