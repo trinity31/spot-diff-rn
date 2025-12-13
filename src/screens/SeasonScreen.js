@@ -1,88 +1,221 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
+import { GameDataService } from '../services/GameDataService';
 
 const { width } = Dimensions.get('window');
 
 // Mock Data for Seasons matching the design
-const SEASONS = [
-  {
-    id: 1,
-    seasonNumber: 'SEASON 1',
-    title: '발견의 시작',
-    description: '탐험가의 첫 걸음을 내딛어보세요.',
-    active: true,
-    status: 'complete', // 'complete', 'progress', 'locked'
-    statusText: '완료',
-    progress: 1, // 100%
-    progressText: '30/30',
-    totalStages: 30,
-    difficulty: 3,
-    illustrationColors: ['#fbbf24', '#f59e0b'],
-    illustrationIcon: '☀️',
-    buttonText: '다시 플레이'
-  },
-  {
-    id: 2,
-    seasonNumber: 'SEASON 2',
-    title: '도시의 미스터리',
-    description: '밤의 도시에 숨겨진 비밀을 찾아내세요.',
-    active: true,
-    status: 'progress',
-    statusText: '진행중',
-    progress: 0.51,
-    progressText: '18/35',
-    totalStages: 35,
-    difficulty: 4,
-    illustrationColors: ['#3b82f6', '#1d4ed8'],
-    illustrationIcon: '🌙',
-    buttonText: '계속하기'
-  },
-  {
-    id: 3,
-    seasonNumber: 'SEASON 3',
-    title: '숲 속의 탐험',
-    description: '신비로운 숲을 탐험하며 자연 속 숨겨진 디테일을 발견하세요.',
-    active: false,
-    status: 'locked',
-    statusText: '잠김',
-    progress: 0.07,
-    progressText: '3/40',
-    totalStages: 40,
-    difficulty: 5,
-    illustrationColors: ['#10b981', '#059669'],
-    illustrationIcon: '🌲',
-    buttonText: '시작하기'
-  },
-  {
-    id: 4,
-    seasonNumber: 'SEASON 4',
-    title: '우주의 비밀',
-    description: '무한한 우주 공간의 숨겨진 차이를 찾아내세요.',
-    active: false,
-    status: 'locked',
-    statusText: '잠김',
-    progress: 0,
-    progressText: '0/50',
-    totalStages: 50,
-    difficulty: 5,
-    illustrationColors: ['#6366f1', '#4f46e5'],
-    illustrationIcon: '🚀',
-    buttonText: '시즌 3 완료 필요'
-  },
-];
+// const SEASONS = [
+//   {
+//     id: 1,
+//     seasonNumber: 'SEASON 1',
+//     title: '발견의 시작',
+//     description: '탐험가의 첫 걸음을 내딛어보세요.',
+//     active: true,
+//     status: 'complete', // 'complete', 'progress', 'locked'
+//     statusText: '완료',
+//     progress: 1, // 100%
+//     progressText: '30/30',
+//     totalStages: 30,
+//     difficulty: 3,
+//     illustrationColors: ['#fbbf24', '#f59e0b'],
+//     illustrationIcon: '☀️',
+//     buttonText: '다시 플레이'
+//   },
+//   {
+//     id: 2,
+//     seasonNumber: 'SEASON 2',
+//     title: '도시의 미스터리',
+//     description: '밤의 도시에 숨겨진 비밀을 찾아내세요.',
+//     active: true,
+//     status: 'progress',
+//     statusText: '진행중',
+//     progress: 0.51,
+//     progressText: '18/35',
+//     totalStages: 35,
+//     difficulty: 4,
+//     illustrationColors: ['#3b82f6', '#1d4ed8'],
+//     illustrationIcon: '🌙',
+//     buttonText: '계속하기'
+//   },
+//   {
+//     id: 3,
+//     seasonNumber: 'SEASON 3',
+//     title: '숲 속의 탐험',
+//     description: '신비로운 숲을 탐험하며 자연 속 숨겨진 디테일을 발견하세요.',
+//     active: false,
+//     status: 'locked',
+//     statusText: '잠김',
+//     progress: 0.07,
+//     progressText: '3/40',
+//     totalStages: 40,
+//     difficulty: 5,
+//     illustrationColors: ['#10b981', '#059669'],
+//     illustrationIcon: '🌲',
+//     buttonText: '시작하기'
+//   },
+//   {
+//     id: 4,
+//     seasonNumber: 'SEASON 4',
+//     title: '우주의 비밀',
+//     description: '무한한 우주 공간의 숨겨진 차이를 찾아내세요.',
+//     active: false,
+//     status: 'locked',
+//     statusText: '잠김',
+//     progress: 0,
+//     progressText: '0/50',
+//     totalStages: 50,
+//     difficulty: 5,
+//     illustrationColors: ['#6366f1', '#4f46e5'],
+//     illustrationIcon: '🚀',
+//     buttonText: '시즌 3 완료 필요'
+//   },
+// ];
 
 const SeasonScreen = () => {
   const navigation = useNavigation();
+  const [seasons, setSeasons] = useState([
+    {
+      id: 1,
+      seasonNumber: 'SEASON 1',
+      title: '발견의 시작',
+      description: '탐험가의 첫 걸음을 내딛어보세요.',
+      active: true,
+      status: 'locked', // Default locked until loaded
+      statusText: '잠김',
+      progress: 0,
+      progressText: '0/30',
+      totalStages: 30,
+      difficulty: 3,
+      illustrationColors: ['#fbbf24', '#f59e0b'],
+      illustrationIcon: '☀️',
+      buttonText: '시작하기'
+    },
+    {
+      id: 2,
+      seasonNumber: 'SEASON 2',
+      title: '도시의 미스터리',
+      description: '밤의 도시에 숨겨진 비밀을 찾아내세요.',
+      active: true, // App logic wise active, but status depends on completion of prev season
+      status: 'locked',
+      statusText: '잠김',
+      progress: 0,
+      progressText: '0/35',
+      totalStages: 35,
+      difficulty: 4,
+      illustrationColors: ['#3b82f6', '#1d4ed8'],
+      illustrationIcon: '🌙',
+      buttonText: '시즌 1 완료 필요'
+    },
+    {
+      id: 3,
+      seasonNumber: 'SEASON 3',
+      title: '숲 속의 탐험',
+      description: '신비로운 숲을 탐험하며 자연 속 숨겨진 디테일을 발견하세요.',
+      active: false,
+      status: 'locked',
+      statusText: '잠김',
+      progress: 0,
+      progressText: '0/40',
+      totalStages: 40,
+      difficulty: 5,
+      illustrationColors: ['#10b981', '#059669'],
+      illustrationIcon: '🌲',
+      buttonText: '시즌 2 완료 필요'
+    },
+    {
+      id: 4,
+      seasonNumber: 'SEASON 4',
+      title: '우주의 비밀',
+      description: '무한한 우주 공간의 숨겨진 차이를 찾아내세요.',
+      active: false,
+      status: 'locked',
+      statusText: '잠김',
+      progress: 0,
+      progressText: '0/50',
+      totalStages: 50,
+      difficulty: 5,
+      illustrationColors: ['#6366f1', '#4f46e5'],
+      illustrationIcon: '🚀',
+      buttonText: '시즌 3 완료 필요'
+    },
+  ]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProgress();
+    }, [])
+  );
+
+  const loadProgress = async () => {
+    // Ensure basic data exists
+    await GameDataService.initializeData();
+
+    // Load progress map
+    const allProgress = await GameDataService.getAllProgress();
+
+    const updatedSeasons = await Promise.all(seasons.map(async (season) => {
+      // Calculate progress for this season
+      const seasonId = season.id.toString();
+      const seasonData = allProgress[seasonId] || {};
+
+      const totalStages = season.totalStages;
+      const clearedCount = Object.values(seasonData).filter(s => s.cleared).length;
+      const progressPercent = totalStages > 0 ? clearedCount / totalStages : 0;
+
+      // Determine status
+      // Logic: Season 1 is always unlocked (or if initData called).
+      // Season N is unlocked if Season N-1 is complete? 
+      // For now, let's keep it simple: Season 1 unlocked always. Others Locked.
+      // Or check if ANY stage in this season is unlocked?
+      // Let's use: if seasonData has any unlocked stage, it is 'progress' or 'complete'
+      // If clearedCount == totalStages -> complete.
+
+      const hasUnlockedStage = Object.values(seasonData).some(s => s.unlocked);
+      let status = 'locked';
+      let statusText = '잠김';
+      let buttonText = season.buttonText; // Default text
+
+      // Override for Season 1 to be always at least 'progress' (active)
+      if (season.id === 1) {
+        status = 'progress';
+      }
+
+      if (clearedCount === totalStages && totalStages > 0) {
+        status = 'complete';
+        statusText = '완료';
+        buttonText = '다시 플레이';
+      } else if (hasUnlockedStage || season.id === 1) {
+        status = 'progress';
+        statusText = '진행중';
+        buttonText = '계속하기';
+      }
+
+      // Force locked for future seasons mock
+      if (season.id > 2) {
+        status = 'locked';
+        buttonText = '준비중';
+      }
+
+      return {
+        ...season,
+        progress: progressPercent,
+        progressText: `${clearedCount}/${totalStages}`,
+        status,
+        statusText,
+        buttonText
+      };
+    }));
+
+    setSeasons(updatedSeasons);
+  };
 
   const handleSeasonPress = (season) => {
-    if (season.state !== 'locked') { // Simple check, though "active" prop handles simpler logic
-      // In this mock, we allow active ones
-      if (season.active) {
-        navigation.navigate('Stage', { seasonId: season.id });
-      }
+    if (season.status !== 'locked') {
+      navigation.navigate('Stage', { seasonId: season.id });
     }
   };
 
@@ -211,7 +344,7 @@ const SeasonScreen = () => {
             <Text style={styles.screenSubtitle}>숨겨진 차이를 찾아 모험을 떠나보세요!</Text>
           </View>
         }
-        data={SEASONS}
+        data={seasons}
         renderItem={renderItem}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
@@ -283,11 +416,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   seasonBadge: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
     borderRadius: 20,
   },
   seasonBadgeText: {
@@ -381,7 +514,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionButtonActive: {
-    backgroundColor: '#667eea', // Fallback or gradient logic in render would be better but this is simple View
+    backgroundColor: '#667eea',
     // Since we need gradient for active button, better to wrap Text in LinearGradient or View.
     // Let's use a solid color here or refactor to use LinearGradient for button
   },

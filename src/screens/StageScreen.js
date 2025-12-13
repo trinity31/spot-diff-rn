@@ -1,24 +1,76 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
+import { GameDataService } from '../services/GameDataService';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - SIZES.padding * 3) / 2;
 
-// Mock Data
-const STAGES = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  title: `Stage ${i + 1}`,
-  locked: i > 2, // First 3 stages unlocked
-  stars: i < 2 ? 3 : 0, // Mock stars for first 2
-}));
-
 const StageScreen = () => {
+  const route = useRoute();
+  const { seasonId } = route.params; // Get passed season ID
+  const [stages, setStages] = useState([]);
+
+  // Mock total stages for now - in real app, might come from config or backend
+  const TOTAL_STAGES = seasonId == 1 ? 30 : seasonId == 2 ? 35 : 40;
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStages();
+    }, [seasonId])
+  );
+
+  const loadStages = async () => {
+    // 1. Get user progress for this season
+    const seasonProgress = await GameDataService.getSeasonProgress(seasonId);
+
+    // 2. Build stage list combining config (1..N) and progress (unlocked/stars)
+    const stageList = Array.from({ length: TOTAL_STAGES }, (_, i) => {
+      const stageId = i + 1;
+      const progress = seasonProgress[stageId];
+
+      // Default: Locked unless found in progress and marked unlocked
+      // Exception: Stage 1 of Season 1 is always unlocked (handled by GameDataService init, but safe fallback here)
+      let unlocked = progress?.unlocked || false;
+      if (seasonId == 1 && stageId == 1) unlocked = true;
+
+      return {
+        id: stageId,
+        title: `Stage ${stageId}`,
+        locked: !unlocked,
+        stars: progress ? progress.stars : 0,
+        cleared: progress ? progress.cleared : false
+      };
+    });
+
+    setStages(stageList);
+  };
+
+  const handleStagePress = (stage) => {
+    // TODO: Navigate to actual Game Screen
+    // For now, let's simulate clearing it to test persistence
+    simulateClearStage(stage.id);
+  };
+
+  const simulateClearStage = async (stageId) => {
+    // Mock clearing with random stars (2 or 3)
+    const stars = Math.floor(Math.random() * 2) + 2;
+    const score = stars * 100;
+
+    console.log(`Clearing Season ${seasonId} Stage ${stageId} with ${stars} stars`);
+    await GameDataService.saveStageClear(seasonId, stageId, stars, score);
+
+    // Refresh
+    loadStages();
+  };
+
   const renderItem = ({ item }) => (
     <TouchableOpacity
       activeOpacity={0.8}
       disabled={item.locked}
+      onPress={() => handleStagePress(item)}
       style={styles.cardContainer}
     >
       <LinearGradient
@@ -28,7 +80,7 @@ const StageScreen = () => {
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>{item.id}</Text>
           {item.locked && <Text style={styles.icon}>🔒</Text>}
-          {!item.locked && <Text style={styles.icon}>▶️</Text>}
+          {!item.locked && <Text style={styles.icon}>{item.cleared ? '✓' : '▶️'}</Text>}
         </View>
         <Text style={styles.stageLabel}>Stage</Text>
 
@@ -51,7 +103,7 @@ const StageScreen = () => {
       style={styles.container}
     >
       <FlatList
-        data={STAGES}
+        data={stages}
         renderItem={renderItem}
         keyExtractor={item => item.id.toString()}
         numColumns={2}
@@ -116,6 +168,8 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 20,
+    color: 'white',
+    fontWeight: 'bold',
   },
   starsContainer: {
     flexDirection: 'row',

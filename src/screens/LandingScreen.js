@@ -1,21 +1,31 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SIZES } from '../constants/theme';
+import { AuthService } from '../services/AuthService';
 
 const { width } = Dimensions.get('window');
 
 const LandingScreen = () => {
   const navigation = useNavigation();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignIn = () => {
-    // Mock Auth logic could go here
-    navigation.replace('Season');
-  };
+  const handleGameStart = async () => {
+    if (isLoading) return;
 
-  const handleGameStart = () => {
-    navigation.replace('Season');
+    setIsLoading(true);
+    try {
+      // Perform anonymous login
+      await AuthService.loginAnonymously();
+
+      // Navigate to Season screen
+      navigation.replace('Season');
+    } catch (error) {
+      console.error('Login failed:', error);
+      setIsLoading(false);
+      // Optional: Show error alert to user
+    }
   };
 
   return (
@@ -32,25 +42,18 @@ const LandingScreen = () => {
         <Text style={styles.title}>틀린그림찾기</Text>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity onPress={handleGameStart} activeOpacity={0.8}>
+          <TouchableOpacity onPress={handleGameStart} activeOpacity={0.8} disabled={isLoading}>
             <LinearGradient
               colors={COLORS.gradients.primaryButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.button}
             >
-              <Text style={styles.buttonText}>게임 시작하기</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleSignIn} activeOpacity={0.8}>
-            <LinearGradient
-              colors={COLORS.gradients.secondaryButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.button, styles.secondaryButton]}
-            >
-              <Text style={styles.buttonText}>로그인</Text>
+              {isLoading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.buttonText}>게임 시작하기</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -99,9 +102,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
     elevation: 8,
-  },
-  secondaryButton: {
-    // Add margin or specific styles if needed
   },
   buttonText: {
     color: COLORS.white,
