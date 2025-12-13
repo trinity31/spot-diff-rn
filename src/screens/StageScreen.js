@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ImageBackground, Platform } from 'react-native';
+import { useHeaderHeight } from '@react-navigation/elements'; // Import hook
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRoute, useFocusEffect, useNavigation } from '@react-navigation/native';
-import { COLORS, SIZES, FONTS } from '../constants/theme';
+import React, { useCallback, useState } from 'react';
+import { Dimensions, FlatList, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SIZES } from '../constants/theme';
 import { GameDataService } from '../services/GameDataService';
-import { Feather } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - SIZES.padding * 3) / 2;
@@ -26,6 +26,7 @@ const STAGE_IMAGES = {
 const StageScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const headerHeight = useHeaderHeight(); // Get header height
   const { seasonId, seasonTitle } = route.params;
   const [stages, setStages] = useState([]);
 
@@ -34,8 +35,9 @@ const StageScreen = () => {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       title: seasonTitle || '스테이지 선택',
-      headerTintColor: '#333',
-      headerStyle: { backgroundColor: '#F5F7FA' },
+      headerTintColor: 'white',
+      headerStyle: { backgroundColor: '#8b5cf6' }, // Match top of gradient or transparent
+      headerTransparent: true, // Let gradient show through
       headerShadowVisible: false,
     });
   }, [navigation, seasonTitle]);
@@ -122,14 +124,17 @@ const StageScreen = () => {
     <View style={styles.container}>
       {/* Background updated to match app theme (SeasonScreen uses ['#667eea', '#764ba2']) */}
       {/* Using a lighter version or complementary gradient for Stage Selection */}
-      <LinearGradient colors={['#f3e7e9', '#e3eeff']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#8b5cf6', '#5b21b6']} style={StyleSheet.absoluteFill} />
 
       <FlatList
         data={stages}
         renderItem={renderItem}
         keyExtractor={item => item.id.toString()}
         numColumns={1} // Single column for "Scenery" look
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: headerHeight + 20 } // Dynamic padding
+        ]}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -142,7 +147,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 20,
-    paddingTop: 10,
+    // paddingTop removed from here
   },
   cardContainer: {
     marginBottom: 20,
@@ -153,10 +158,12 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 }, // increased shadow
+    shadowOpacity: 0.3, // increased opacity
+    shadowRadius: 24, // increased radius
+    elevation: 8,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   cardImage: {
     flex: 1,
