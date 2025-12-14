@@ -9,19 +9,7 @@ import { GameDataService } from '../services/GameDataService';
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - SIZES.padding * 3) / 2;
 
-const STAGE_TITLES = {
-  1: "아늑한 거실",
-  2: "눈 내리는 거리",
-  3: "산타의 선물",
-  4: "루돌프와 썰매",
-  5: "장작불 앞",
-};
-
-// Local Assets (Mocking multiple stages with the same asset for now)
-const STAGE_IMAGES = {
-  1: require('../../assets/images/season1_stage1_orig.png'),
-  // Add more placeholders if available, otherwise fallback
-};
+import { SEASON1_STAGES } from '../constants/StageData';
 
 const StageScreen = () => {
   const navigation = useNavigation();
@@ -30,7 +18,7 @@ const StageScreen = () => {
   const { seasonId, seasonTitle } = route.params;
   const [stages, setStages] = useState([]);
 
-  const TOTAL_STAGES = seasonId == 1 ? 30 : seasonId == 2 ? 35 : 40;
+  const TOTAL_STAGES = 30; // Fixed to 30 for all seasons for now
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -57,13 +45,18 @@ const StageScreen = () => {
       let unlocked = progress?.unlocked || false;
       if (seasonId == 1 && stageId == 1) unlocked = true;
 
+      // Get Data from Shared Constant
+      const data = SEASON1_STAGES[stageId];
+      const title = data ? data.title : `여행지 ${stageId}`;
+      // Use specific image if available, else fallback to stage 1 if exists, else null
+      const image = data ? data.imageOrig : (SEASON1_STAGES[1] ? SEASON1_STAGES[1].imageOrig : null);
+
       return {
         id: stageId,
-        title: STAGE_TITLES[stageId] || `여행지 ${stageId}`,
+        title: title,
         locked: !unlocked,
         cleared: progress ? progress.cleared : false,
-        // Fallback to stage 1 image for demo
-        image: STAGE_IMAGES[stageId] || STAGE_IMAGES[1]
+        image: image
       };
     });
 
@@ -97,22 +90,20 @@ const StageScreen = () => {
             item.locked ? styles.overlayLocked : styles.overlayUnlocked
           ]}>
             {/* Content */}
-            <View style={styles.textContainer}>
-              <Text style={styles.stageNumber}>
-                {item.id.toString().padStart(2, '0')}
-              </Text>
+            <Text style={styles.stageNumber}>
+              {item.id.toString().padStart(2, '0')}
+            </Text>
 
-              <View style={styles.divider} />
+            <View style={styles.divider} />
 
-              <Text style={styles.stageTitle} numberOfLines={1}>
-                {item.locked ? '잠긴 여행지' : item.title}
-              </Text>
+            <Text style={styles.stageTitle} numberOfLines={1}>
+              {item.locked ? '잠긴 여행지' : item.title}
+            </Text>
 
-              {/* Status Icons */}
-              <View style={styles.statusIcons}>
-                {item.locked && <Text style={styles.lockIcon}>🔒</Text>}
-                {item.cleared && <Text style={styles.checkIcon}>✓</Text>}
-              </View>
+            {/* Status Icons */}
+            <View style={styles.statusIcons}>
+              {item.locked && <Text style={styles.lockIcon}>🔒</Text>}
+              {item.cleared && <Text style={styles.checkIcon}>✓</Text>}
             </View>
           </View>
         </ImageBackground>
@@ -169,49 +160,50 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    justifyContent: 'flex-end', // Text at bottom
+    // justifyContent: 'flex-end', // Removed to let overlay fill
   },
   imageLocked: {
     opacity: 0.5, // Dim the image itself
   },
   cardOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
   overlayUnlocked: {
-    backgroundColor: 'rgba(0,0,0,0.1)', // Slight dark tint for text readability
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker tint
   },
   overlayLocked: {
-    backgroundColor: 'rgba(0,0,0,0.6)', // Darker overlay for locked
+    backgroundColor: 'rgba(0,0,0,0.8)', // Darker overlay for locked
     justifyContent: 'center',
     alignItems: 'center',
   },
-  textContainer: {
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)', // Backdrop for text
-    borderRadius: 10,
-    minWidth: 120,
-  },
+
   stageNumber: {
     fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
     fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'Roboto',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
   divider: {
-    width: 20,
-    height: 2,
+    width: 40,
+    height: 3,
     backgroundColor: 'white',
-    marginVertical: 5,
+    marginVertical: 10,
   },
   stageTitle: {
-    fontSize: 16,
+    fontSize: 24,
     color: 'white',
-    fontWeight: '600',
-    marginBottom: 5,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   statusIcons: {
     flexDirection: 'row',

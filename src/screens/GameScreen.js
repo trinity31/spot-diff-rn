@@ -1,41 +1,34 @@
 
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { ConfettiSystem } from '../components/ConfettiSystem';
 import { GameDataService } from '../services/GameDataService';
 
-// Local Assets
-const originalImage = require('../../assets/images/season1_stage1_3to2_v2_orig.png');
-const diffImage = require('../../assets/images/season1_stage1_3to2_v2_diff.png');
-
-// Mock Data for a stage
-const MOCK_STAGE_DATA = {
-  id: 1,
-  title: '아늑한 거실',
-  // Use require for local assets in React Native
-  imageSource1: originalImage,
-  imageSource2: diffImage,
-  differences: [
-    // Normalized coordinates (0.0 to 1.0) - High Precision Calibration 2025-12-14
-    { id: 1, x: 0.5547, y: 0.0512, radius: 0.06 }, // Star
-    { id: 2, x: 0.1951, y: 0.4483, radius: 0.06 }, // Stocking
-    { id: 3, x: 0.3292, y: 0.8370, radius: 0.06 }, // Gift Box 1
-    { id: 4, x: 0.4363, y: 0.8903, radius: 0.06 }, // Gift Box 2
-    { id: 5, x: 0.7541, y: 0.7273, radius: 0.06 }, // Cat
-  ],
-  // timeLimit: 60, // Removed
-};
-
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SEASON1_STAGES } from '../constants/StageData';
 
 const GameScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { seasonId, stageId } = route.params || {};
   const { width, height } = useWindowDimensions();
+
+  // Load Stage Data
+  const stageData = SEASON1_STAGES[stageId];
+
+  // Fallback if data is missing (e.g. not implemented yet)
+  if (!stageData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Stage {stageId} Data Not Found</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 20 }}>
+          <Text style={{ color: 'blue' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const insets = useSafeAreaInsets();
 
@@ -78,7 +71,7 @@ const GameScreen = () => {
 
   // Check Win Condition
   useEffect(() => {
-    if (foundDifferences.length === MOCK_STAGE_DATA.differences.length) {
+    if (foundDifferences.length === stageData.differences.length) {
       setGameState('won');
       handleWin();
     }
@@ -114,7 +107,7 @@ const GameScreen = () => {
     const yPct = locationY / finalHeight;
 
     let found = false;
-    MOCK_STAGE_DATA.differences.forEach((diff) => {
+    stageData.differences.forEach((diff) => {
       if (foundDifferences.includes(diff.id)) return;
 
       // Calculate distance in normalized space (simple circle check)
@@ -139,7 +132,7 @@ const GameScreen = () => {
         </TouchableOpacity>
 
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{MOCK_STAGE_DATA.title}</Text>
+          <Text style={styles.headerTitle}>{stageData.title}</Text>
         </View>
 
         <View style={{ width: 50 }} />
@@ -150,11 +143,11 @@ const GameScreen = () => {
         <View style={[styles.gameCard, { width: finalWidth, height: finalHeight * 2 + 2, backgroundColor: 'transparent' }]}>
           {/* Top Image */}
           <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
-            <Image source={MOCK_STAGE_DATA.imageSource1} style={styles.gameImage} resizeMode="contain" />
+            <Image source={stageData.imageOrig} style={styles.gameImage} resizeMode="contain" />
 
             {/* Markers */}
             {foundDifferences.map(id => {
-              const diff = MOCK_STAGE_DATA.differences.find(d => d.id === id);
+              const diff = stageData.differences.find(d => d.id === id);
               if (!diff) return null;
 
               // Calculate pixel position
@@ -188,9 +181,9 @@ const GameScreen = () => {
 
           {/* Bottom Image */}
           <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
-            <Image source={MOCK_STAGE_DATA.imageSource2} style={styles.gameImage} resizeMode="contain" />
+            <Image source={stageData.imageDiff} style={styles.gameImage} resizeMode="contain" />
             {foundDifferences.map(id => {
-              const diff = MOCK_STAGE_DATA.differences.find(d => d.id === id);
+              const diff = stageData.differences.find(d => d.id === id);
               if (!diff) return null;
 
               const left = diff.x * finalWidth;
@@ -232,7 +225,7 @@ const GameScreen = () => {
         {/* Center: Progress */}
         <View style={styles.footerCenter}>
           <Text style={styles.progressText}>
-            {foundDifferences.length} / {MOCK_STAGE_DATA.differences.length}
+            {foundDifferences.length} / {stageData.differences.length}
           </Text>
         </View>
 
