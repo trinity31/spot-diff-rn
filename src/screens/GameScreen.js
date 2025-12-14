@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Alert, SafeAreaView, Pressable, useWindowDimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { COLORS, SIZES, FONTS } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { GameDataService } from '../services/GameDataService';
 
 // Local Assets
-const originalImage = require('../../assets/images/season1_stage1_orig.png');
-const diffImage = require('../../assets/images/season1_stage1_diff.png');
+const originalImage = require('../../assets/images/season1_stage1_3to2_v2_orig.png');
+const diffImage = require('../../assets/images/season1_stage1_3to2_v2_diff.png');
 
 // Mock Data for a stage
 const MOCK_STAGE_DATA = {
@@ -15,13 +14,14 @@ const MOCK_STAGE_DATA = {
   imageSource1: originalImage,
   imageSource2: diffImage,
   differences: [
-    // Normalized coordinates (0.0 to 1.0)
-    // Final Calibration by User (2025-12-13)
-    { id: 1, x: 0.37, y: 0.17, radius: 0.09 },  // Star 
-    { id: 2, x: 0.15, y: 0.50, radius: 0.09 },  // Stocking
-    { id: 3, x: 0.28, y: 0.93, radius: 0.09 },  // Gift Box
+    // Normalized coordinates (0.0 to 1.0) - High Precision Calibration 2025-12-14
+    { id: 1, x: 0.5547, y: 0.0512, radius: 0.06 }, // Star
+    { id: 2, x: 0.1951, y: 0.4483, radius: 0.06 }, // Stocking
+    { id: 3, x: 0.3292, y: 0.8370, radius: 0.06 }, // Gift Box 1
+    { id: 4, x: 0.4363, y: 0.8903, radius: 0.06 }, // Gift Box 2
+    { id: 5, x: 0.7541, y: 0.7273, radius: 0.06 }, // Cat
   ],
-  timeLimit: 60,
+  // timeLimit: 60, // Removed
 };
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,33 +46,26 @@ const GameScreen = () => {
 
   const MAX_IMAGE_HEIGHT = AVAILABLE_HEIGHT / 2;
   const MAX_IMAGE_WIDTH = AVAILABLE_WIDTH;
-  const FINAL_IMAGE_SIZE = Math.min(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);
 
-  const [timeLeft, setTimeLeft] = useState(MOCK_STAGE_DATA.timeLimit);
+  // For 1.2:1 Aspect Ratio
+  const IMAGE_ASPECT_RATIO = 1.2;
+
+  // Calculate based on width (Targeting Full Width)
+  let finalWidth = MAX_IMAGE_WIDTH;
+  let finalHeight = finalWidth / IMAGE_ASPECT_RATIO;
+
+  // If calculating based on width results in too tall images, scale down
+  // But on most modern phones, 3:2 fits easily in half-height.
+  if (finalHeight > MAX_IMAGE_HEIGHT) {
+    finalHeight = MAX_IMAGE_HEIGHT;
+    finalWidth = finalHeight * IMAGE_ASPECT_RATIO;
+  }
+
+  // const [timeLeft, setTimeLeft] = useState(MOCK_STAGE_DATA.timeLimit); // Removed
   const [foundDifferences, setFoundDifferences] = useState([]);
   const [gameState, setGameState] = useState('playing');
 
-  // Timers
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setGameState('lost');
-          Alert.alert('Game Over', '시간이 초과되었습니다.', [
-            { text: '다시 하기', onPress: resetGame },
-            { text: '나가기', onPress: () => navigation.goBack() }
-          ]);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [gameState]);
+  // Timers - REMOVED
 
   // Check Win Condition
   useEffect(() => {
@@ -83,11 +76,9 @@ const GameScreen = () => {
   }, [foundDifferences]);
 
   const handleWin = async () => {
-    let stars = 1;
-    if (timeLeft > 40) stars = 3;
-    else if (timeLeft > 20) stars = 2;
-
-    const score = stars * 1000 + timeLeft * 10;
+    // Stars are now fixed to 3 for clearing
+    const stars = 3;
+    const score = 1000; // Fixed score per stage clear
 
     await GameDataService.saveStageClear(seasonId, stageId, stars, score);
 
@@ -97,7 +88,7 @@ const GameScreen = () => {
   };
 
   const resetGame = () => {
-    setTimeLeft(MOCK_STAGE_DATA.timeLimit);
+    // setTimeLeft(MOCK_STAGE_DATA.timeLimit); // Removed
     setFoundDifferences([]);
     setGameState('playing');
   };
@@ -107,8 +98,8 @@ const GameScreen = () => {
     const { locationX, locationY } = event.nativeEvent;
 
     // Normalize touch to 0.0 - 1.0
-    const xPct = locationX / FINAL_IMAGE_SIZE;
-    const yPct = locationY / FINAL_IMAGE_SIZE;
+    const xPct = locationX / finalWidth;
+    const yPct = locationY / finalHeight;
 
     let found = false;
     MOCK_STAGE_DATA.differences.forEach((diff) => {
@@ -134,9 +125,7 @@ const GameScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>{'<'} 뒤로</Text>
         </TouchableOpacity>
-        <View style={styles.timerContainer}>
-          <Text style={styles.timerText}>{timeLeft}초</Text>
-        </View>
+        {/* Timer Removed */}
         <View style={styles.scoreContainer}>
           <Text style={styles.scoreText}>{foundDifferences.length} / {MOCK_STAGE_DATA.differences.length}</Text>
         </View>
@@ -144,21 +133,20 @@ const GameScreen = () => {
 
       {/* Game Area */}
       <View style={styles.gameContent}>
-        <View style={[styles.gameCard, { width: FINAL_IMAGE_SIZE, backgroundColor: 'transparent' }]}>
+        <View style={[styles.gameCard, { width: finalWidth, height: finalHeight * 2 + 2, backgroundColor: 'transparent' }]}>
           {/* Top Image */}
-          <Pressable onPress={handleTouch} style={{ width: FINAL_IMAGE_SIZE, height: FINAL_IMAGE_SIZE }}>
+          <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
             <Image source={MOCK_STAGE_DATA.imageSource1} style={styles.gameImage} resizeMode="contain" />
 
-            {/* Markers */}
             {/* Markers */}
             {foundDifferences.map(id => {
               const diff = MOCK_STAGE_DATA.differences.find(d => d.id === id);
               if (!diff) return null;
 
               // Calculate pixel position
-              const left = diff.x * FINAL_IMAGE_SIZE;
-              const top = diff.y * FINAL_IMAGE_SIZE;
-              const size = diff.radius * FINAL_IMAGE_SIZE * 2;
+              const left = diff.x * finalWidth;
+              const top = diff.y * finalHeight;
+              const size = diff.radius * finalWidth * 2; // Radius relative to width
 
               return (
                 <View
@@ -185,15 +173,15 @@ const GameScreen = () => {
           <View style={styles.divider} />
 
           {/* Bottom Image */}
-          <Pressable onPress={handleTouch} style={{ width: FINAL_IMAGE_SIZE, height: FINAL_IMAGE_SIZE }}>
+          <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
             <Image source={MOCK_STAGE_DATA.imageSource2} style={styles.gameImage} resizeMode="contain" />
             {foundDifferences.map(id => {
               const diff = MOCK_STAGE_DATA.differences.find(d => d.id === id);
               if (!diff) return null;
 
-              const left = diff.x * FINAL_IMAGE_SIZE;
-              const top = diff.y * FINAL_IMAGE_SIZE;
-              const size = diff.radius * FINAL_IMAGE_SIZE * 2;
+              const left = diff.x * finalWidth;
+              const top = diff.y * finalHeight;
+              const size = diff.radius * finalWidth * 2;
 
               return (
                 <View
@@ -247,19 +235,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  timerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  timerText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
+  // timerContainer: Removed
+  // timerText: Removed
   scoreContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
