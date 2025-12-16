@@ -16,6 +16,7 @@ const StageScreen = () => {
   const { seasonId, seasonTitle } = route.params;
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const flatListRef = React.useRef(null);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -46,7 +47,8 @@ const StageScreen = () => {
       console.log('StageScreen - Firebase 스테이지:', firebaseStages);
       console.log('StageScreen - 진행 상황:', seasonProgress);
 
-      const stageList = firebaseStages.map(stage => {
+      // 스테이지 목록 생성
+      const stageList = firebaseStages.map((stage) => {
         const stageId = stage.stageNumber;
         const progress = seasonProgress[stageId];
 
@@ -54,18 +56,37 @@ const StageScreen = () => {
         // 첫 번째 스테이지는 항상 언락
         if (seasonId == 1 && stageId == 1) unlocked = true;
 
+        // 썸네일 URL 결정 (React Native Image가 자동으로 캐싱)
+        const thumbnailUrl = stage.imageThumbnailUrl || stage.imageOriginalUrl;
+
         return {
           id: stageId,
           title: stage.title,
           locked: !unlocked,
           cleared: progress?.cleared || false,
-          imageUrl: stage.imageThumbnailUrl || stage.imageOriginalUrl // 썸네일 우선, 없으면 풀 사이즈
+          imageUrl: thumbnailUrl
         };
       });
 
-      console.log('StageScreen - 최종 스테이지 목록:', stageList);
+      console.log('StageScreen - 최종 스테이지 목록 (캐싱됨):', stageList);
 
       setStages(stageList);
+
+      // 잠기지 않은 마지막 스테이지로 자동 스크롤
+      const lastUnlockedIndex = stageList.reduce((lastIndex, stage, index) => {
+        return !stage.locked ? index : lastIndex;
+      }, 0);
+
+      // FlatList 렌더링 후 스크롤
+      setTimeout(() => {
+        if (flatListRef.current && lastUnlockedIndex > 0) {
+          flatListRef.current.scrollToIndex({
+            index: lastUnlockedIndex,
+            animated: true,
+            viewPosition: 0.15 // 헤더 아래쪽 여백 확보 (화면 상단에서 15% 위치)
+          });
+        }
+      }, 100);
     } catch (error) {
       console.error('Failed to load stages:', error);
     } finally {
@@ -140,6 +161,7 @@ const StageScreen = () => {
       <LinearGradient colors={['#8b5cf6', '#5b21b6']} style={StyleSheet.absoluteFill} />
 
       <FlatList
+        ref={flatListRef}
         data={stages}
         renderItem={renderItem}
         keyExtractor={item => item.id.toString()}
@@ -149,6 +171,17 @@ const StageScreen = () => {
           { paddingTop: headerHeight + 20 } // Dynamic padding
         ]}
         showsVerticalScrollIndicator={false}
+        onScrollToIndexFailed={(info) => {
+          // 스크롤 실패 시 재시도
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true
+              });
+            }
+          }, 100);
+        }}
       />
     </View>
   );
