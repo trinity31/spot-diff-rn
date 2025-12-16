@@ -26,11 +26,11 @@ export const SEASON1_STAGES = {
     imageDiff: require('../../assets/images/season1/season1_stage2_diff.png'),
     differences: [
       // Placeholder coordinates (copy of Stage 1 for now)
-      { id: 1, x: 0.5547, y: 0.0512, radius: 0.06 },
-      { id: 2, x: 0.1951, y: 0.4483, radius: 0.06 },
-      { id: 3, x: 0.3292, y: 0.8370, radius: 0.06 },
-      { id: 4, x: 0.4363, y: 0.8903, radius: 0.06 },
-      { id: 5, x: 0.7541, y: 0.7273, radius: 0.06 },
+      { id: 1, x: 0.4876, y: 0.0690, radius: 0.06 },
+      { id: 2, x: 0.5921, y: 0.4086, radius: 0.06 },
+      { id: 3, x: 0.6966, y: 0.7346, radius: 0.06 },
+      { id: 4, x: 0.6862, y: 0.9801, radius: 0.06 },
+      { id: 5, x: 0.0496, y: 0.4984, radius: 0.06 },
     ],
   },
   3: {
@@ -101,6 +101,79 @@ export const SEASON1_STAGES = {
     title: '한강 공원의 치킨 배달',
     imageOrig: require('../../assets/images/season1/season1_stage10_orig.png'),
     imageDiff: require('../../assets/images/season1/season1_stage10_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+};
+
+export const SEASON2_STAGES = {
+  1: {
+    id: 1,
+    title: '비 내리는 네온 거리',
+    imageOrig: require('../../assets/images/season2/season2_stage1_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage1_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  2: {
+    id: 2,
+    title: '버려진 지하철역',
+    imageOrig: require('../../assets/images/season2/season2_stage2_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage2_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  3: {
+    id: 3,
+    title: '비밀스러운 재즈 바',
+    imageOrig: require('../../assets/images/season2/season2_stage3_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage3_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  4: {
+    id: 4,
+    title: '새벽의 마천루',
+    imageOrig: require('../../assets/images/season2/season2_stage4_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage4_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  5: {
+    id: 5,
+    title: '텅 빈 박물관의 밤',
+    imageOrig: require('../../assets/images/season2/season2_stage5_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage5_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  6: {
+    id: 6,
+    title: '골동품 가게의 뒷문',
+    imageOrig: require('../../assets/images/season2/season2_stage6_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage6_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  7: {
+    id: 7,
+    title: '달빛 아래 옥상',
+    imageOrig: require('../../assets/images/season2/season2_stage7_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage7_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  8: {
+    id: 8,
+    title: '안개 낀 항구',
+    imageOrig: require('../../assets/images/season2/season2_stage8_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage8_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  9: {
+    id: 9,
+    title: '폐쇄된 오페라 극장',
+    imageOrig: require('../../assets/images/season2/season2_stage9_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage9_diff.png'),
+    differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
+  },
+  10: {
+    id: 10,
+    title: '심야의 다이너',
+    imageOrig: require('../../assets/images/season2/season2_stage10_orig.png'),
+    imageDiff: require('../../assets/images/season2/season2_stage10_diff.png'),
     differences: [{ id: 1, x: 0.5, y: 0.5, radius: 0.06 }],
   },
 };

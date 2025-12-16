@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
-import { GameDataService } from '../services/GameDataService';
+import FirebaseDataService from '../services/FirebaseDataService';
 
 const { width } = Dimensions.get('window');
 
@@ -79,72 +79,8 @@ const { width } = Dimensions.get('window');
 const SeasonScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const [seasons, setSeasons] = useState([
-    {
-      id: 1,
-      seasonNumber: 'SEASON 1',
-      title: '발견의 시작',
-      description: '탐험가의 첫 걸음을 내딛어보세요.',
-      active: true,
-      status: 'locked', // Default locked until loaded
-      statusText: '잠김',
-      progress: 0,
-      progressText: '0/30',
-      totalStages: 30,
-      difficulty: 3,
-      illustrationColors: ['#fbbf24', '#f59e0b'],
-      illustrationIcon: '☀️',
-      buttonText: '시작하기'
-    },
-    {
-      id: 2,
-      seasonNumber: 'SEASON 2',
-      title: '도시의 미스터리',
-      description: '밤의 도시에 숨겨진 비밀을 찾아내세요.',
-      active: true, // App logic wise active, but status depends on completion of prev season
-      status: 'locked',
-      statusText: '잠김',
-      progress: 0,
-      progressText: '0/35',
-      totalStages: 35,
-      difficulty: 4,
-      illustrationColors: ['#3b82f6', '#1d4ed8'],
-      illustrationIcon: '🌙',
-      buttonText: '시즌 1 완료 필요'
-    },
-    {
-      id: 3,
-      seasonNumber: 'SEASON 3',
-      title: '숲 속의 탐험',
-      description: '신비로운 숲을 탐험하며 자연 속 숨겨진 디테일을 발견하세요.',
-      active: false,
-      status: 'locked',
-      statusText: '잠김',
-      progress: 0,
-      progressText: '0/40',
-      totalStages: 40,
-      difficulty: 5,
-      illustrationColors: ['#10b981', '#059669'],
-      illustrationIcon: '🌲',
-      buttonText: '시즌 2 완료 필요'
-    },
-    {
-      id: 4,
-      seasonNumber: 'SEASON 4',
-      title: '우주의 비밀',
-      description: '무한한 우주 공간의 숨겨진 차이를 찾아내세요.',
-      active: false,
-      status: 'locked',
-      statusText: '잠김',
-      progress: 0,
-      progressText: '0/50',
-      totalStages: 50,
-      difficulty: 5,
-      illustrationColors: ['#6366f1', '#4f46e5'],
-      illustrationIcon: '🚀',
-      buttonText: '시즌 3 완료 필요'
-    },
-  ]);
+  const [seasons, setSeasons] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -153,66 +89,69 @@ const SeasonScreen = () => {
   );
 
   const loadProgress = async () => {
-    // Ensure basic data exists
-    await GameDataService.initializeData();
+    try {
+      setLoading(true);
 
-    // Load progress map
-    const allProgress = await GameDataService.getAllProgress();
+      // Firestore에서 시즌 데이터 로드
+      const firebaseSeasons = await FirebaseDataService.getAllSeasons();
 
-    const updatedSeasons = await Promise.all(seasons.map(async (season) => {
-      // Calculate progress for this season
-      const seasonId = season.id.toString();
-      const seasonData = allProgress[seasonId] || {};
+      // 첫 스테이지 자동 언록
+      await FirebaseDataService.initializeData();
 
-      const totalStages = season.totalStages;
-      const clearedCount = Object.values(seasonData).filter(s => s.cleared).length;
-      const progressPercent = totalStages > 0 ? clearedCount / totalStages : 0;
+      // 사용자 진행 상황 로드
+      const allProgress = await FirebaseDataService.getUserProgress();
 
-      // Determine status
-      // Logic: Season 1 is always unlocked (or if initData called).
-      // Season N is unlocked if Season N-1 is complete? 
-      // For now, let's keep it simple: Season 1 unlocked always. Others Locked.
-      // Or check if ANY stage in this season is unlocked?
-      // Let's use: if seasonData has any unlocked stage, it is 'progress' or 'complete'
-      // If clearedCount == totalStages -> complete.
+      const updatedSeasons = firebaseSeasons.map((fbSeason) => {
+        const seasonId = fbSeason.id;
+        const seasonData = allProgress[seasonId] || {};
 
-      const hasUnlockedStage = Object.values(seasonData).some(s => s.unlocked);
-      let status = 'locked';
-      let statusText = '잠김';
-      let buttonText = season.buttonText; // Default text
+        const totalStages = fbSeason.totalStages;
+        const clearedCount = Object.values(seasonData).filter(s => s.cleared).length;
+        const progressPercent = totalStages > 0 ? clearedCount / totalStages : 0;
 
-      // Override for Season 1 to be always at least 'progress' (active)
-      if (season.id === 1) {
-        status = 'progress';
-      }
+        const hasUnlockedStage = Object.values(seasonData).some(s => s.unlocked);
+        let status = 'locked';
+        let statusText = '잠김';
+        let buttonText = `시즌 ${seasonId - 1} 완료 필요`;
 
-      if (clearedCount === totalStages && totalStages > 0) {
-        status = 'complete';
-        statusText = '완료';
-        buttonText = '다시 플레이';
-      } else if (hasUnlockedStage || season.id === 1) {
-        status = 'progress';
-        statusText = '진행중';
-        buttonText = '계속하기';
-      }
+        // 시즌 1은 항상 언록
+        if (seasonId === 1) {
+          status = 'progress';
+          buttonText = '시작하기';
+        }
 
-      // Force locked for future seasons mock
-      if (season.id > 2) {
-        status = 'locked';
-        buttonText = '준비중';
-      }
+        if (clearedCount === totalStages && totalStages > 0) {
+          status = 'complete';
+          statusText = '완료';
+          buttonText = '다시 플레이';
+        } else if (hasUnlockedStage || seasonId === 1) {
+          status = 'progress';
+          statusText = '진행중';
+          buttonText = '계속하기';
+        }
 
-      return {
-        ...season,
-        progress: progressPercent,
-        progressText: `${clearedCount}/${totalStages}`,
-        status,
-        statusText,
-        buttonText
-      };
-    }));
+        // active가 false인 시즌은 잠금
+        if (!fbSeason.active) {
+          status = 'locked';
+          buttonText = '준비중';
+        }
 
-    setSeasons(updatedSeasons);
+        return {
+          ...fbSeason,
+          progress: progressPercent,
+          progressText: `${clearedCount}/${totalStages}`,
+          status,
+          statusText,
+          buttonText
+        };
+      });
+
+      setSeasons(updatedSeasons);
+    } catch (error) {
+      console.error('Failed to load seasons:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSeasonPress = (season) => {
@@ -337,6 +276,18 @@ const SeasonScreen = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        style={[styles.container, styles.loadingContainer]}
+      >
+        <ActivityIndicator size="large" color={COLORS.white} />
+        <Text style={styles.loadingText}>시즌 데이터 로딩중...</Text>
+      </LinearGradient>
+    );
+  }
+
   return (
     <LinearGradient
       colors={['#667eea', '#764ba2']} // Matches design background
@@ -362,6 +313,16 @@ const SeasonScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '600',
   },
   header: {
     paddingTop: 10, // Reduced from 60 to 10 - adjusted because SafeAreaView handles some top padding usually, or just visually reducing it

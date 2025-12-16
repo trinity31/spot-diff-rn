@@ -3,23 +3,86 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfettiSystem } from '../components/ConfettiSystem';
-import { GameDataService } from '../services/GameDataService';
-
-import { SEASON1_STAGES } from '../constants/StageData';
+import FirebaseDataService from '../services/FirebaseDataService';
+import ImageCacheService from '../services/ImageCacheService';
 
 const GameScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { seasonId, stageId } = route.params || {};
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
-  // Load Stage Data
-  const stageData = SEASON1_STAGES[stageId];
+  // Load Stage Data from Firebase
+  const [stageData, setStageData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [foundDifferences, setFoundDifferences] = useState([]);
+  const [gameState, setGameState] = useState('playing');
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [hearts, setHearts] = useState(5);
+  const [cachedImages, setCachedImages] = useState({
+    original: null,
+    difference: null
+  });
 
-  // Fallback if data is missing (e.g. not implemented yet)
+  useEffect(() => {
+    loadStageData();
+  }, [seasonId, stageId]);
+
+  // ... (imports)
+
+  // ... (imports)
+
+  const loadStageData = async () => {
+    try {
+      setLoading(true);
+
+      // 1. Firebase에서 스테이지 데이터 로드
+      const stage = await FirebaseDataService.getStageById(`season${seasonId}-stage${stageId}`);
+      console.log('GameScreen - 로드된 스테이지:', stage);
+      setStageData(stage);
+
+      // 2. 이미지 URL 직접 사용 (캐싱 제거)
+      setCachedImages({
+        original: stage.imageOriginalUrl,
+        difference: stage.imageDifferenceUrl
+      });
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load stage:', error);
+      setLoading(false);
+    }
+  };
+
+  // Check Win Condition
+  useEffect(() => {
+    if (stageData && foundDifferences.length === stageData.differences.length) {
+      setGameState('won');
+      handleWin();
+    }
+  }, [foundDifferences, stageData]);
+
+  // Fallback if data is missing
+  if (loading || !cachedImages.original || !cachedImages.difference) {
+    return (
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="white" />
+          <Text style={styles.loadingTitle}>
+            {stageData?.title || `스테이지 ${stageId}`}
+          </Text>
+          <Text style={styles.loadingSubtitle}>
+            이미지를 불러오는 중...
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   if (!stageData) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -30,8 +93,6 @@ const GameScreen = () => {
       </View>
     );
   }
-
-  const insets = useSafeAreaInsets();
 
   // Dynamic Calculation
   // Dynamic Calculation
@@ -62,35 +123,30 @@ const GameScreen = () => {
     finalWidth = finalHeight * IMAGE_ASPECT_RATIO;
   }
 
-  // const [timeLeft, setTimeLeft] = useState(MOCK_STAGE_DATA.timeLimit); // Removed
-  const [foundDifferences, setFoundDifferences] = useState([]);
-  const [gameState, setGameState] = useState('playing');
-  const [showClearModal, setShowClearModal] = useState(false);
-  const [hearts, setHearts] = useState(5);
-
-  // Timers - REMOVED
-
-  // Check Win Condition
-  useEffect(() => {
-    if (foundDifferences.length === stageData.differences.length) {
-      setGameState('won');
-      handleWin();
-    }
-  }, [foundDifferences]);
-
   const handleWin = async () => {
     // Stars are now fixed to 3 for clearing
     const stars = 3;
     const score = 1000; // Fixed score per stage clear
 
-    await GameDataService.saveStageClear(seasonId, stageId, stars, score);
+    await FirebaseDataService.saveStageClear(seasonId, stageId, stars, score);
 
     setShowClearModal(true);
-    /*
-    Alert.alert('Stage Clear!', `별 ${stars}개를 획득했습니다!`, [
-      { text: '다음 스테이지', onPress: () => navigation.goBack() }
-    ]);
-    */
+  };
+
+  const handleNextStage = () => {
+    const nextStageId = stageId + 1;
+
+    // Check if next stage exists (assuming 10 stages per season)
+    if (nextStageId <= 10) {
+      // Navigate to next stage (replace current screen)
+      navigation.replace('Game', {
+        seasonId: seasonId,
+        stageId: nextStageId
+      });
+    } else {
+      // Last stage of season - go back to stage list
+      navigation.goBack();
+    }
   };
 
   const resetGame = () => {
@@ -106,6 +162,7 @@ const GameScreen = () => {
     // Normalize touch to 0.0 - 1.0
     const xPct = locationX / finalWidth;
     const yPct = locationY / finalHeight;
+    console.log(`[CLICK COORDINATE] x: ${xPct.toFixed(4)}, y: ${yPct.toFixed(4)}`);
 
     let found = false;
     stageData.differences.forEach((diff) => {
@@ -122,6 +179,14 @@ const GameScreen = () => {
         found = true;
       }
     });
+  };
+
+  // Helper to determine image source
+  const getImageSource = (img) => {
+    if (typeof img === 'number') {
+      return img;
+    }
+    return { uri: img };
   };
 
   return (
@@ -144,7 +209,7 @@ const GameScreen = () => {
         <View style={[styles.gameCard, { width: finalWidth, height: finalHeight * 2 + 2, backgroundColor: 'transparent' }]}>
           {/* Top Image */}
           <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
-            <Image source={stageData.imageOrig} style={styles.gameImage} resizeMode="contain" />
+            <Image source={getImageSource(cachedImages.original)} style={styles.gameImage} resizeMode="contain" />
 
             {/* Markers */}
             {foundDifferences.map(id => {
@@ -182,7 +247,7 @@ const GameScreen = () => {
 
           {/* Bottom Image */}
           <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
-            <Image source={stageData.imageDiff} style={styles.gameImage} resizeMode="contain" />
+            <Image source={getImageSource(cachedImages.difference)} style={styles.gameImage} resizeMode="contain" />
             {foundDifferences.map(id => {
               const diff = stageData.differences.find(d => d.id === id);
               if (!diff) return null;
@@ -264,7 +329,7 @@ const GameScreen = () => {
               style={styles.nextButton}
               onPress={() => {
                 setShowClearModal(false);
-                navigation.goBack();
+                handleNextStage();
               }}
             >
               <Text style={styles.nextButtonText}>다음 스테이지</Text>
@@ -279,6 +344,25 @@ const GameScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingTitle: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 24,
+    textAlign: 'center',
+  },
+  loadingSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',

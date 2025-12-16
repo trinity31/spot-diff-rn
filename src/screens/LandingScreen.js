@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ActivityIn
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SIZES } from '../constants/theme';
-import { AuthService } from '../services/AuthService';
+import AuthService from '../services/AuthService';
 
 const { width } = Dimensions.get('window');
 

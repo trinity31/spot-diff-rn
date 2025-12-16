@@ -2,14 +2,12 @@ import { useHeaderHeight } from '@react-navigation/elements'; // Import hook
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useState } from 'react';
-import { Dimensions, FlatList, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SIZES } from '../constants/theme';
-import { GameDataService } from '../services/GameDataService';
+import FirebaseDataService from '../services/FirebaseDataService';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - SIZES.padding * 3) / 2;
-
-import { SEASON1_STAGES } from '../constants/StageData';
 
 const StageScreen = () => {
   const navigation = useNavigation();
@@ -17,8 +15,7 @@ const StageScreen = () => {
   const headerHeight = useHeaderHeight(); // Get header height
   const { seasonId, seasonTitle } = route.params;
   const [stages, setStages] = useState([]);
-
-  const TOTAL_STAGES = 30; // Fixed to 30 for all seasons for now
+  const [loading, setLoading] = useState(true);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -37,30 +34,43 @@ const StageScreen = () => {
   );
 
   const loadStages = async () => {
-    const seasonProgress = await GameDataService.getSeasonProgress(seasonId);
+    try {
+      setLoading(true);
 
-    const stageList = Array.from({ length: TOTAL_STAGES }, (_, i) => {
-      const stageId = i + 1;
-      const progress = seasonProgress[stageId];
-      let unlocked = progress?.unlocked || false;
-      if (seasonId == 1 && stageId == 1) unlocked = true;
+      // Firebase에서 스테이지 목록과 진행 상황 가져오기
+      const [firebaseStages, seasonProgress] = await Promise.all([
+        FirebaseDataService.getStagesBySeasonId(seasonId),
+        FirebaseDataService.getSeasonProgress(seasonId)
+      ]);
 
-      // Get Data from Shared Constant
-      const data = SEASON1_STAGES[stageId];
-      const title = data ? data.title : `여행지 ${stageId}`;
-      // Use specific image if available, else fallback to stage 1 if exists, else null
-      const image = data ? data.imageOrig : (SEASON1_STAGES[1] ? SEASON1_STAGES[1].imageOrig : null);
+      console.log('StageScreen - Firebase 스테이지:', firebaseStages);
+      console.log('StageScreen - 진행 상황:', seasonProgress);
 
-      return {
-        id: stageId,
-        title: title,
-        locked: !unlocked,
-        cleared: progress ? progress.cleared : false,
-        image: image
-      };
-    });
+      const stageList = firebaseStages.map(stage => {
+        const stageId = stage.stageNumber;
+        const progress = seasonProgress[stageId];
 
-    setStages(stageList);
+        let unlocked = progress?.unlocked || false;
+        // 첫 번째 스테이지는 항상 언락
+        if (seasonId == 1 && stageId == 1) unlocked = true;
+
+        return {
+          id: stageId,
+          title: stage.title,
+          locked: !unlocked,
+          cleared: progress?.cleared || false,
+          imageUrl: stage.imageThumbnailUrl || stage.imageOriginalUrl // 썸네일 우선, 없으면 풀 사이즈
+        };
+      });
+
+      console.log('StageScreen - 최종 스테이지 목록:', stageList);
+
+      setStages(stageList);
+    } catch (error) {
+      console.error('Failed to load stages:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStagePress = (stage) => {
@@ -79,7 +89,7 @@ const StageScreen = () => {
     >
       <View style={styles.cardShadow}>
         <ImageBackground
-          source={item.image}
+          source={{ uri: item.imageUrl }}
           style={[styles.cardImage, item.locked && styles.imageLocked]}
           imageStyle={{ borderRadius: 15 }}
           resizeMode="cover"
@@ -111,6 +121,18 @@ const StageScreen = () => {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={['#8b5cf6', '#5b21b6']} style={StyleSheet.absoluteFill} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="white" />
+          <Text style={styles.loadingText}>스테이지 로딩 중...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Background updated to match app theme (SeasonScreen uses ['#667eea', '#764ba2']) */}
@@ -135,6 +157,16 @@ const StageScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    marginTop: 12,
   },
   listContent: {
     padding: 20,

@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, StyleSheet, Image, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { COLORS, FONTS, SIZES } from '../constants/theme';
+import { COLORS, SIZES } from '../constants/theme';
+import AuthService from '../services/AuthService';
 
 const { width } = Dimensions.get('window');
 
@@ -10,11 +11,23 @@ const SplashScreen = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace('Landing');
-    }, 2000);
+    const checkAuthAndNavigate = async () => {
+      // 2초 대기 (스플래시 화면 표시)
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-    return () => clearTimeout(timer);
+      // 인증 상태 확인
+      const isLoggedIn = await AuthService.isLoggedIn();
+
+      if (isLoggedIn) {
+        // 이미 로그인되어 있으면 Season 화면으로
+        navigation.replace('Season');
+      } else {
+        // 로그인되어 있지 않으면 Landing 화면으로
+        navigation.replace('Landing');
+      }
+    };
+
+    checkAuthAndNavigate();
   }, [navigation]);
 
   return (
