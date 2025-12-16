@@ -6,9 +6,18 @@ class ImageCacheService {
   }
 
   async ensureCacheDirExists() {
-    const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(this.cacheDir, { intermediates: true });
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(this.cacheDir, { size: false });
+      if (!dirInfo.exists) {
+        await FileSystem.StorageAccessFramework.makeDirectoryAsync(this.cacheDir);
+      }
+    } catch (error) {
+      // 디렉토리가 없으면 생성 시도
+      try {
+        await FileSystem.StorageAccessFramework.makeDirectoryAsync(this.cacheDir);
+      } catch (mkdirError) {
+        console.error('Failed to create cache directory:', mkdirError);
+      }
     }
   }
 
@@ -16,12 +25,17 @@ class ImageCacheService {
     try {
       await this.ensureCacheDirExists();
 
-      const filename = url.split('/').pop();
+      const filename = url.split('/').pop().split('?')[0]; // 쿼리 파라미터 제거
       const localUri = `${this.cacheDir}${filename}`;
 
-      const fileInfo = await FileSystem.getInfoAsync(localUri);
-      if (fileInfo.exists) {
-        return localUri;
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(localUri, { size: false });
+        if (fileInfo.exists) {
+          console.log(`Using cached image: ${filename}`);
+          return localUri;
+        }
+      } catch (error) {
+        // 파일이 없으면 다운로드
       }
 
       // 다운로드
@@ -46,15 +60,19 @@ class ImageCacheService {
 
   async getCacheSize() {
     try {
-      const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
+      const dirInfo = await FileSystem.getInfoAsync(this.cacheDir, { size: true });
       if (dirInfo.exists) {
         // 캐시 디렉토리의 모든 파일 크기 합계
         const files = await FileSystem.readDirectoryAsync(this.cacheDir);
         let totalSize = 0;
 
         for (const file of files) {
-          const fileInfo = await FileSystem.getInfoAsync(`${this.cacheDir}${file}`);
-          totalSize += fileInfo.size || 0;
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(`${this.cacheDir}${file}`, { size: true });
+            totalSize += fileInfo.size || 0;
+          } catch (error) {
+            // 파일 정보를 가져올 수 없으면 스킵
+          }
         }
 
         return totalSize;
