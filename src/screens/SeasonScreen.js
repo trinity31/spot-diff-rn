@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import FirebaseDataService from '../services/FirebaseDataService';
@@ -78,7 +78,10 @@ const { width } = Dimensions.get('window');
 
 const SeasonScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { completedSeasonId, scrollToSeasonId } = route.params || {};
   const insets = useSafeAreaInsets();
+  const flatListRef = React.useRef(null);
   const [seasons, setSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -147,6 +150,23 @@ const SeasonScreen = () => {
       });
 
       setSeasons(updatedSeasons);
+
+      // 스크롤 대상 시즌이 있으면 스크롤
+      if (scrollToSeasonId && updatedSeasons.length > 0) {
+        const targetIndex = updatedSeasons.findIndex(s => s.id === scrollToSeasonId);
+
+        if (targetIndex >= 0) {
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToIndex({
+                index: targetIndex,
+                animated: true,
+                viewPosition: 0.5 // 화면 중앙
+              });
+            }
+          }, 300);
+        }
+      }
     } catch (error) {
       console.error('Failed to load seasons:', error);
     } finally {
@@ -294,6 +314,7 @@ const SeasonScreen = () => {
       style={styles.container}
     >
       <FlatList
+        ref={flatListRef}
         ListHeaderComponent={
           <View style={[styles.header, { paddingTop: insets.top + 20, paddingBottom: 40 }]}>
             <Text style={styles.screenTitle}>🔍 틀린그림찾기</Text>
@@ -305,6 +326,16 @@ const SeasonScreen = () => {
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true
+              });
+            }
+          }, 100);
+        }}
       />
     </LinearGradient>
   );
