@@ -7,7 +7,6 @@ import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, Touchable
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfettiSystem } from '../components/ConfettiSystem';
 import FirebaseDataService from '../services/FirebaseDataService';
-import ImageCacheService from '../services/ImageCacheService';
 
 const GameScreen = () => {
   const navigation = useNavigation();
@@ -27,6 +26,11 @@ const GameScreen = () => {
     original: null,
     difference: null
   });
+  const [imagesLoaded, setImagesLoaded] = useState({
+    original: false,
+    difference: false
+  });
+  const [isSeasonComplete, setIsSeasonComplete] = useState(false);
 
   useEffect(() => {
     loadStageData();
@@ -40,6 +44,12 @@ const GameScreen = () => {
     try {
       setLoading(true);
 
+      // 이미지 로딩 상태 초기화
+      setImagesLoaded({
+        original: false,
+        difference: false
+      });
+
       // 1. Firebase에서 스테이지 데이터 로드
       const stage = await FirebaseDataService.getStageById(`season${seasonId}-stage${stageId}`);
       console.log('GameScreen - 로드된 스테이지:', stage);
@@ -51,6 +61,7 @@ const GameScreen = () => {
         difference: stage.imageDifferenceUrl
       });
 
+      // 데이터 로딩은 완료되었지만, 이미지 로딩은 Image 컴포넌트에서 추적
       setLoading(false);
     } catch (error) {
       console.error('Failed to load stage:', error);
@@ -61,12 +72,14 @@ const GameScreen = () => {
   // Check Win Condition
   useEffect(() => {
     if (stageData && foundDifferences.length === stageData.differences.length) {
+      const isLastStage = stageId === 10;
+      setIsSeasonComplete(isLastStage);
       setGameState('won');
       handleWin();
     }
   }, [foundDifferences, stageData]);
 
-  // Fallback if data is missing
+  // 데이터 로딩 중이거나, 이미지 URL이 없으면 로딩 화면 표시
   if (loading || !cachedImages.original || !cachedImages.difference) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
@@ -133,19 +146,28 @@ const GameScreen = () => {
     setShowClearModal(true);
   };
 
-  const handleNextStage = () => {
+  const handleNextStage = async () => {
     const nextStageId = stageId + 1;
+    const isLastStageOfSeason = nextStageId > 10;
 
-    // Check if next stage exists (assuming 10 stages per season)
-    if (nextStageId <= 10) {
+    setShowClearModal(false);
+
+    if (!isLastStageOfSeason) {
       // Navigate to next stage (replace current screen)
       navigation.replace('Game', {
         seasonId: seasonId,
         stageId: nextStageId
       });
     } else {
-      // Last stage of season - go back to stage list
-      navigation.goBack();
+      // Season complete - unlock next season's first stage
+      const nextSeasonId = seasonId + 1;
+      await FirebaseDataService.unlockStage(nextSeasonId, 1);
+
+      // Go to SeasonScreen with scroll to next season
+      navigation.navigate('Season', {
+        completedSeasonId: seasonId,
+        scrollToSeasonId: nextSeasonId
+      });
     }
   };
 
@@ -162,7 +184,8 @@ const GameScreen = () => {
     // Normalize touch to 0.0 - 1.0
     const xPct = locationX / finalWidth;
     const yPct = locationY / finalHeight;
-    console.log(`[CLICK COORDINATE] x: ${xPct.toFixed(4)}, y: ${yPct.toFixed(4)}`);
+    const coordStr = `x: ${xPct.toFixed(4)}, y: ${yPct.toFixed(4)}`;
+    console.log(`[CLICK COORDINATE] ${coordStr}`);
 
     let found = false;
     stageData.differences.forEach((diff) => {
@@ -209,7 +232,14 @@ const GameScreen = () => {
         <View style={[styles.gameCard, { width: finalWidth, height: finalHeight * 2 + 2, backgroundColor: 'transparent' }]}>
           {/* Top Image */}
           <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
-            <Image source={getImageSource(cachedImages.original)} style={styles.gameImage} resizeMode="contain" />
+            <Image
+              source={getImageSource(cachedImages.original)}
+              style={styles.gameImage}
+              resizeMode="contain"
+              onLoadEnd={() => {
+                setImagesLoaded(prev => ({ ...prev, original: true }));
+              }}
+            />
 
             {/* Markers */}
             {foundDifferences.map(id => {
@@ -247,7 +277,14 @@ const GameScreen = () => {
 
           {/* Bottom Image */}
           <Pressable onPress={handleTouch} style={{ width: finalWidth, height: finalHeight }}>
-            <Image source={getImageSource(cachedImages.difference)} style={styles.gameImage} resizeMode="contain" />
+            <Image
+              source={getImageSource(cachedImages.difference)}
+              style={styles.gameImage}
+              resizeMode="contain"
+              onLoadEnd={() => {
+                setImagesLoaded(prev => ({ ...prev, difference: true }));
+              }}
+            />
             {foundDifferences.map(id => {
               const diff = stageData.differences.find(d => d.id === id);
               if (!diff) return null;
@@ -303,6 +340,20 @@ const GameScreen = () => {
         </TouchableOpacity>
 
       </View>
+
+      {/* 이미지 로딩 오버레이 */}
+      {(!imagesLoaded.original || !imagesLoaded.difference) && (
+        <View style={styles.imageLoadingOverlay}>
+          <ActivityIndicator size="large" color="white" />
+          <Text style={styles.loadingTitle}>
+            {stageData.title}
+          </Text>
+          <Text style={styles.loadingSubtitle}>
+            이미지를 불러오는 중...
+          </Text>
+        </View>
+      )}
+
       {/* Stage Clear Modal */}
       <Modal
         animationType="fade"
@@ -319,20 +370,32 @@ const GameScreen = () => {
             style={styles.modalContent}
           >
             {/* Title */}
-            <Text style={styles.modalTitle}>축하합니다!</Text>
+            <Text style={styles.modalTitle}>
+              {isSeasonComplete
+                ? `축하합니다!\n시즌 ${seasonId}을(를) 완료했어요!`
+                : '축하합니다!'}
+            </Text>
 
             {/* Big Emoji */}
-            <Text style={styles.centerEmoji}>🎉</Text>
+            <Text style={styles.centerEmoji}>
+              {isSeasonComplete ? '🏆' : '🎉'}
+            </Text>
+
+            {/* Subtitle for season complete */}
+            {isSeasonComplete && (
+              <Text style={styles.modalSubtitle}>
+                모든 스테이지를 클리어했습니다!
+              </Text>
+            )}
 
             {/* Next Button */}
             <TouchableOpacity
               style={styles.nextButton}
-              onPress={() => {
-                setShowClearModal(false);
-                handleNextStage();
-              }}
+              onPress={handleNextStage}
             >
-              <Text style={styles.nextButtonText}>다음 스테이지</Text>
+              <Text style={styles.nextButtonText}>
+                {isSeasonComplete ? '다음 시즌으로' : '다음 스테이지'}
+              </Text>
             </TouchableOpacity>
           </LinearGradient>
         </View>
@@ -363,6 +426,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 12,
     textAlign: 'center',
+  },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(102, 126, 234, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    zIndex: 1000,
   },
   header: {
     flexDirection: 'row',
@@ -411,7 +486,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   divider: {
-    height: 2,
+    height: 4,
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
   marker: {
@@ -509,10 +584,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
+    textAlign: 'center',
   },
   centerEmoji: {
     fontSize: 60,
     marginBottom: 24,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   modalMessage: {
     fontSize: 18,
