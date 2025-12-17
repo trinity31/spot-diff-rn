@@ -151,21 +151,39 @@ const SeasonScreen = () => {
 
       setSeasons(updatedSeasons);
 
-      // 스크롤 대상 시즌이 있으면 스크롤
-      if (scrollToSeasonId && updatedSeasons.length > 0) {
-        const targetIndex = updatedSeasons.findIndex(s => s.id === scrollToSeasonId);
+      // 스크롤 로직
+      let targetIndex = -1;
 
-        if (targetIndex >= 0) {
-          setTimeout(() => {
-            if (flatListRef.current) {
-              flatListRef.current.scrollToIndex({
-                index: targetIndex,
-                animated: true,
-                viewPosition: 0.5 // 화면 중앙
-              });
-            }
-          }, 300);
+      if (scrollToSeasonId) {
+        // 파라미터로 전달된 시즌으로 스크롤 (시즌 완료 후 다음 시즌으로 이동)
+        targetIndex = updatedSeasons.findIndex(s => s.id === scrollToSeasonId);
+      } else {
+        // 앱 첫 진입 시: 마지막으로 진행 중인 시즌으로 스크롤
+        // 진행 중(progress)이면서 잠기지 않은 마지막 시즌 찾기
+        const lastProgressIndex = updatedSeasons.reduce((lastIndex, season, index) => {
+          if (season.status === 'progress' || season.status === 'complete') {
+            return index;
+          }
+          return lastIndex;
+        }, 0);
+
+        // 첫 번째 시즌이 아닌 경우에만 스크롤
+        if (lastProgressIndex > 0) {
+          targetIndex = lastProgressIndex;
         }
+      }
+
+      // 타겟 시즌으로 스크롤
+      if (targetIndex >= 0 && updatedSeasons.length > 0) {
+        setTimeout(() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToIndex({
+              index: targetIndex,
+              animated: true,
+              viewPosition: 0.5 // 화면 중앙
+            });
+          }
+        }, 300);
       }
     } catch (error) {
       console.error('Failed to load seasons:', error);
